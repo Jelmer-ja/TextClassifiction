@@ -6,19 +6,13 @@ from classes import *
 import nltk
 
 def main():
-    #Create data
-    train = sentimentTrain()
-    test = sentimentTest()
-    nbayes = cl.NaiveBayesClassifier(train)
-    dtree = cl.DecisionTreeClassifier(train)
-    maxent = cl.MaxEntClassifier(train)
-    data = storydata()
+    object = storydata()
+    train = object.getTrain()
+    test = object.getTest()
+    #nbayes = cl.NaiveBayesClassifier(train)
+    #dtree = cl.DecisionTreeClassifier(train)
+    #maxent = cl.MaxEntClassifier(train)
 
-    #for i in range(0,6):
-        #print(str(nbayes.classify(test[i][0])))
-    #print(nbayes.accuracy(test))
-    #print(dtree.accuracy(test))
-    #print(maxent.accuracy(test))
 
 #Use these functions to extract features out of the pastas
 def pos_features(word):
@@ -47,6 +41,18 @@ def sentimentTest():
     ("I feel amazing!", 'pos'),
     ('Gary is a friend of mine.', 'pos'),
     ("I can't believe I'm doing this.", 'neg')]
+
+def classifierTest():
+    train = sentimentTrain()
+    test = sentimentTest()
+    nbayes = cl.NaiveBayesClassifier(train)
+    dtree = cl.DecisionTreeClassifier(train)
+    maxent = cl.MaxEntClassifier(train)
+    for i in range(0,6):
+        print(str(nbayes.classify(test[i][0])))
+    print(nbayes.accuracy(test))
+    print(dtree.accuracy(test))
+    print(maxent.accuracy(test))
 
 if(__name__ == '__main__'):
     main()
