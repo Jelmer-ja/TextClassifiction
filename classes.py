@@ -19,7 +19,7 @@ class storydata:
 
     #fill the list of urls with the creepypasta story lins from the text file
     def getUrls(self):
-        redflags = ['pastas-indexed-category','discussion-post','wp-content','http:','category-','category/','update','page/']
+        redflags = ['pastas-indexed-category','discussion-post','wp-content','category-','category/','update','page/','page-','tag/','author/']
         blacklist = []
         #Open the file of blacklisted pages, extract the names and close the file again
         blfile = open('blacklist.txt','r')
@@ -39,7 +39,7 @@ class storydata:
                         clean = False
                 if(clean):
                     self.urls.append(url2)
-        print len(self.urls)
+        print(len(self.urls))
 
     #Retrieve every story and score for every url in the list and add them to the 'stories' and 'ratings' lists
     def saveStories(self):
@@ -47,7 +47,7 @@ class storydata:
             text,rating = self.getPage(url)
             self.stories.append(text)
             self.ratings.append(rating)
-            print len(self.stories)
+            print(str(self.urls.index(url)) + ' ' + url)
 
     def roundRatings(self):
         avg = sum(self.ratings) / float(len(self.ratings))
@@ -68,7 +68,7 @@ class storydata:
         plt.bar(xs, ys, width, align='center')
         plt.xticks(xs, labels)  # Replace default x-ticks with xs, then replace xs with labels
         plt.yticks(ys)
-        plt.savefig('netscore.png')
+        plt.savefig('netscore2.png')
 
     #Returns the story from the url as plaintext and the rating as a float
     def getPage(self,url):
@@ -79,7 +79,7 @@ class storydata:
 
         #Find and extract the rating
         rb = soup.find('strong')
-        rating = float(rb.text.strip())  # strip() is used to remove starting and trailing
+        rating = float(int(rb.text.strip()[:-1]) / 10)  # strip() is used to remove starting and trailing
 
         #Find, extract and merge together the text into a single string
         pees = soup.find_all('p')
