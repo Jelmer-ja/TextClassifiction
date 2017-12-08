@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import scipy as sc
 import textblob.classifiers as cl
 import urllib2
+import math
 from bs4 import BeautifulSoup
+from bs4.element import Comment
 import cfscrape as cfs
 
 class storydata:
@@ -12,10 +14,9 @@ class storydata:
         self.stories = []
         self.ratings = []
         self.roundedratings = []
-        self.urls = []
-        self.getUrls()
+        self.urls = ['https://www.creepypasta.com/the-dead-zone/']
+        #self.getUrls()
         self.saveStories()
-        self.plotRatings()
 
     #fill the list of urls with the creepypasta story lins from the text file
     def getUrls(self):
@@ -41,13 +42,24 @@ class storydata:
                     self.urls.append(url2)
         print(len(self.urls))
 
-    #Retrieve every story and score for every url in the list and add them to the 'stories' and 'ratings' lists
     def saveStories(self):
         for url in self.urls:
             text,rating = self.getPage(url)
-            self.stories.append(text)
-            self.ratings.append(rating)
-            print(str(self.urls.index(url)) + ' ' + url)
+            filename = '/home/jelmer/Documents/pastadata/' + str(self.urls.index(url)) + '.txt'
+            f = open(filename,'w')
+            f.write(str(rating))
+            f.write('\n')
+            print(text)
+            f.write(text)
+            f.close()
+
+    #Retrieve every story and score for every url in the list and add them to the 'stories' and 'ratings' lists
+    def collectStories(self,x,y):
+        for i in range(x,math.max(y,len(self.urls))):
+            # GET TEXT AND RATING FROM FILE i
+            #self.stories.append(text)
+            #self.ratings.append(rating)
+            pass
 
     def roundRatings(self):
         avg = sum(self.ratings) / float(len(self.ratings))
@@ -68,7 +80,14 @@ class storydata:
         plt.bar(xs, ys, width, align='center')
         plt.xticks(xs, labels)  # Replace default x-ticks with xs, then replace xs with labels
         plt.yticks(ys)
-        plt.savefig('netscore2.png')
+        plt.savefig('netscore.png')
+
+    def tag_visible(self,element):
+        if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
+            return False
+        if isinstance(element, Comment):
+            return False
+        return True
 
     #Returns the story from the url as plaintext and the rating as a float
     def getPage(self,url):
@@ -76,20 +95,31 @@ class storydata:
         scraper = cfs.create_scraper()
         page = scraper.get(url).content
         soup = BeautifulSoup(page, 'html.parser')
+        [s.extract() for s in soup(['style', 'script', '[document]', 'head', 'title'])]
+        readable_text = soup.getText().encode('utf-8', 'ignore') #Extract the text from the html and convert it to ASCII
 
         #Find and extract the rating
         rb = soup.find('strong')
-        rating = float(int(rb.text.strip()[:-1]) / 10)  # strip() is used to remove starting and trailing
+        rating = float(rb.text.strip())  # strip() is used to remove starting and trailing
 
-        #Find, extract and merge together the text into a single string
-        pees = soup.find_all('p')
+        #Find and extract the story's text
+        count = False
         text = ''
-        for p in pees:
-            if(p.text != 'Explore other pastas:'):
-                text += p.text
+        for s in readable_text.splitlines():
+            if not count:
+                if('Add this post to your list of favorites' in s):
+                    count = True
             else:
-                break
+                if('Rate this item:' in s):
+                    break
+                else:
+                    text += s + '\n'
 
+        #Delete newlines at the end of the text so that they don't mess with the data later
+        for i in range(1,12):
+            if text[-1] == '\n':
+                text = text[:-1]
+            else: break
         return text, rating
 
     def getTrain(self):
