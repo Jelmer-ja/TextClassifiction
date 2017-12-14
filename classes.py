@@ -5,6 +5,8 @@ import scipy as sc
 import textblob.classifiers as cl
 import urllib2
 import math
+import random
+import string
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 import cfscrape as cfs
@@ -14,9 +16,18 @@ class storydata:
         self.stories = []
         self.ratings = []
         self.urls = []
+        self.limits = [7.2,8.3]
         self.roundedratings = []
         self.collectStories()
-        self.plotRatings()
+        self.roundRatings()
+        self.shuffle()
+        #print(len([x for x in self.roundedratings[0:619] if x == 'good']))
+        #print(len([x for x in self.roundedratings[0:619] if x == 'average']))
+        #print(len([x for x in self.roundedratings[0:619] if x == 'bad']))
+        #print(len([x for x in self.roundedratings[619:826] if x == 'good']))
+        #print(len([x for x in self.roundedratings[619:826] if x == 'average']))
+        #print(len([x for x in self.roundedratings[619:826] if x == 'bad']))
+
 
     #fill the list of urls with the creepypasta story lins from the text file
     def getUrls(self):
@@ -88,19 +99,33 @@ class storydata:
         for i in range(0,826):
             filename = '/home/jelmer/Documents/pastadata/' + str(i) + '.txt'
             f = open(filename, 'r')
-            self.ratings.append(float(f.readlines()[0]))
-            #self.stories.append(file.read()[4:])
+            lines = f.readlines()
+            self.ratings.append(float(lines[0]))
+            self.stories.append(string.join(lines[1:],''))
             f.close()
 
-
-
+    #Turn the ratings from a double to a class label
     def roundRatings(self):
-        avg = sum(self.ratings) / float(len(self.ratings))
         for r in self.ratings:
-            if (r > avg):
-                self.roundedratings.add('good')
+            if (r > self.limits[1]):
+                self.roundedratings.append('good')
+            elif (r > self.limits[0]):
+                self.roundedratings.append('average')
             else:
                 self.roundedratings.append('bad')
+
+    #Shuffle the stories so that they are distributed over the sets independent of time
+    def shuffle(self):
+        random.seed(1337)
+        random.shuffle(self.stories)
+        random.shuffle(self.ratings)
+        random.shuffle(self.roundedratings)
+
+    #Calculate the class limits
+    def getLimits(self):
+        sort = sorted(self.ratings)
+        print(sort[274])
+        print(sort[550])
 
     #Plot the distribution of ratings among stories
     def plotRatings(self):
@@ -115,15 +140,14 @@ class storydata:
         plt.yticks(ys)
         plt.savefig('netscore.png')
 
-    def tag_visible(self,element):
-        if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
-            return False
-        if isinstance(element, Comment):
-            return False
-        return True
-
     def getTrain(self):
-        return None
+        data = []
+        for i in range(0,619):
+            data.append((self.stories[i],self.roundedratings[i]))
+        return data
 
     def getTest(self):
-        return None
+        data = []
+        for i in range(619, 826):
+            data.append((self.stories[i], self.roundedratings[i]))
+        return data
