@@ -21,6 +21,7 @@ class storydata:
         self.collectStories()
         self.roundRatings()
         self.shuffle()
+        print('Data loaded')
         #print(len([x for x in self.roundedratings[0:619] if x == 'good']))
         #print(len([x for x in self.roundedratings[0:619] if x == 'average']))
         #print(len([x for x in self.roundedratings[0:619] if x == 'bad']))
@@ -56,6 +57,19 @@ class storydata:
             f.write(str(rating))
             f.write('\n')
             f.write(text)
+            f.close()
+
+    def toAscii(self):
+        for i in range(0,len(self.ratings)):
+            print('Saving story ' + str(i))
+            text = self.stories[i].decode('utf-8')
+            text2 = text.encode('ascii','ignore')
+            rating = self.ratings[i]
+            filename = '/home/jelmer/Documents/pastadata2/' + str(i) + '.txt'
+            f = open(filename,'w')
+            f.write(str(rating))
+            f.write('\n')
+            f.write(text2)
             f.close()
 
     # Returns the story from the url as plaintext and the rating as a float
@@ -97,7 +111,7 @@ class storydata:
     #Retrieve every story and score for every url in the list and add them to the 'stories' and 'ratings' lists
     def collectStories(self):
         for i in range(0,826):
-            filename = '/home/jelmer/Documents/pastadata/' + str(i) + '.txt'
+            filename = '/home/jelmer/Documents/pastadata2/' + str(i) + '.txt'
             f = open(filename, 'r')
             lines = f.readlines()
             self.ratings.append(float(lines[0]))
@@ -107,7 +121,7 @@ class storydata:
     #Turn the ratings from a double to a class label
     def roundRatings(self):
         for r in self.ratings:
-            if (r > self.limits[1]):
+            if (r >= self.limits[1]):
                 self.roundedratings.append('good')
             elif (r > self.limits[0]):
                 self.roundedratings.append('average')
@@ -116,7 +130,7 @@ class storydata:
 
     #Shuffle the stories so that they are distributed over the sets independent of time
     def shuffle(self):
-        random.seed(1337)
+        random.seed(111)
         random.shuffle(self.stories)
         random.shuffle(self.ratings)
         random.shuffle(self.roundedratings)
