@@ -122,11 +122,11 @@ class storydata:
     def roundRatings(self):
         for r in self.ratings:
             if (r >= self.limits[1]):
-                self.roundedratings.append('good')
+                self.roundedratings.append(2)
             elif (r > self.limits[0]):
-                self.roundedratings.append('average')
+                self.roundedratings.append(1)
             else:
-                self.roundedratings.append('bad')
+                self.roundedratings.append(0)
 
     #Shuffle the stories so that they are distributed over the sets independent of time
     def shuffle(self):

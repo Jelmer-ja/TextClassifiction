@@ -2,7 +2,6 @@ import sklearn as skl
 import numpy as np
 import scipy as sc
 from classes import *
-from sklearn.svm import SVC
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import wordpunct_tokenize, sent_tokenize
@@ -29,8 +28,9 @@ colors = ['Amber','Black','Blue','Brown','Burgundy','Chocolate','Coffee','Crimso
           'Gray','Green','Harlequin','Indigo','Ivory','Jade','Lavender','Olive','Orange','Raspberry','Red',
           'Rose','Ruby','Sapphire','Scarlet','Silver','Violet','Viridian','White','Yellow']
             #https://simple.wikipedia.org/wiki/List_of_colors which appeared in train set
-gore = ['blood','flesh','bloody','bloodstained','mangled','blood','liver','heart','brain','splatter'] #TODO good list
+gore = ['blood','flesh','bloody','bloodstained','mangled','blood','liver','heart','brain','splatter','carnage','slash','slashed'] #TODO good list
 dic = pyphen.Pyphen(lang='en')
+bow_list = [] #Total word list for bag of words features
 
 """
 FUNCTIONS
@@ -39,32 +39,34 @@ FUNCTIONS
 def main():
     object = storydata()
     train_data = object.getTrain()
-    print('Data imported to main class')
     #test_data = object.getTest()
+    print('Data imported to main class')
 
     # Extract the features
     train_X = [x[0] for x in train_data]
     train_y = [x[1] for x in train_data]
 
+    #prepare_dictionary(train_X)
+    #print(len(bow_list))
+
     features = list(map(extract_features, train_X))
     print('Features extracted\n')
 
     # Classify and evaluate
-    skf = sklearn.model_selection.KFold(n_splits=10)
+    skf = sklearn.model_selection.StratifiedKFold(n_splits=10)
     scores = []
-    for fold_id, (train_indexes, validation_indexes) in enumerate(
-            skf.split(train_y, train_X)):
+    for fold_id, (train_indexes, validation_indexes) in enumerate(skf.split([str(i) for i in range(0,619)], train_y)):
         # Print the fold number
         print("Fold %d" % (fold_id + 1))
 
         # Collect the data for this train/validation split
-        train_features = [features[x] for x in train_indexes] ; print('features trained')
-        train_labels = [train_y[x] for x in train_indexes] ; print('labels trained')
-        validation_features = [features[x] for x in validation_indexes] ; print('val features trained')
-        validation_labels = [train_y[x] for x in validation_indexes] ; print('val labels trained')
+        train_features = [features[x] for x in train_indexes] ;
+        train_labels = [train_y[x] for x in train_indexes] ;
+        validation_features = [features[x] for x in validation_indexes] ;
+        validation_labels = [train_y[x] for x in validation_indexes] ;
 
         # Classify and add the scores to be able to average later
-        y_pred = classify(train_features, train_labels, validation_features) ; print('classified')
+        y_pred = classify(train_features, train_labels, validation_features)
         scores.append(evaluate(validation_labels, y_pred)) ; print('scores saved')
 
         # Print a newline
@@ -104,13 +106,13 @@ def extract_features(text):
     """
     TEXT MINING FEATURES
     """
-    """for t in tags:
+    for t in tags:
         features.append(len([x for x in pos_tags if x[1] == t])) #PoS tags
     for char in string.ascii_lowercase:
         features.append(len([x for x in text if x.lower() == char])) #character frequencies
     features.append(sum([1 for x in bag_of_words if x in stop_words]) / len(bag_of_words)) #stop word usage"""
     features.append(len(bag_of_words)) #nr of words = story length
-    """features.append(len(bag_of_sents)) #nr of sentences = story length in sentences
+    features.append(len(bag_of_sents)) #nr of sentences = story length in sentences
     features.append(sum([1 for x in bag_of_words if x in present_tenses_auxilliaries or x in past_tenses_auxilliaries]) / len(bag_of_sents)) #Auxilliaries, nrmsl
 
     """
@@ -147,8 +149,29 @@ def extract_features(text):
     features.append(nr / len(bag_of_sents)) #Word repetition within sentences, nrmsl
     features.append(len([x for x in pos_tags if x[1] == 'ADV']) / len(bag_of_sents)) #Adverb usage per sentence, nrmsl - Same as normal PoS-tagging?
     features.append(len(bag_of_words) / sum([1 for l in text if l == '\n'])) #Average paragraph length
-    """
+
     return features
+
+def extract_features_bow(text):
+    bag_of_words = [string.lower(x) for x in wordpunct_tokenize(text)]
+    dict = {}
+    for word in bow_list:
+        dict[word] = 0
+    for word in bag_of_words:
+        dict[word] += 1
+    return dict.values()
+
+def extract_features_test(text):
+    return [len(text)]
+
+def prepare_dictionary(stories):
+    #Create dictionary entries for every word in the data
+    for s in stories:
+        bag_of_words = [string.lower(x) for x in wordpunct_tokenize(s)]
+        for w in bag_of_words:
+            if w not in bow_list:
+                bow_list.append(w)
+
 
 # Classify using the features
 def classify(train_features, train_labels, test_features):
