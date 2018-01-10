@@ -14,6 +14,7 @@ import sklearn.metrics
 import sklearn.model_selection
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
+from multiprocessing.dummy import Pool
 
 """
 WORD LISTS/SETUP
@@ -49,7 +50,11 @@ def main():
     #prepare_dictionary(train_X)
     #print(len(bow_list))
 
-    features = list(map(extract_features, train_X))
+    pool = Pool(processes=8)
+    features = pool.map(extract_features, train_X)
+    features = list(features)
+    pool.close()
+    # features = list(map(extract_features, train_X))
     print('Features extracted\n')
 
     # Classify and evaluate
@@ -127,7 +132,7 @@ def extract_features(text):
     #KING
     nr = 0
     for s in bag_of_sents: #Passive voice detection: Sentences are detected as passive if they contain a version
-        tokens = sent_tokenize(s) #of the verb "to be" followed by any verb form but a gerund
+        tokens = wordpunct_tokenize(s) #of the verb "to be" followed by any verb form but a gerund
         s_tags = nltk.pos_tag(tokens)
         passive = False; be = False
         for t in s_tags:
@@ -150,6 +155,7 @@ def extract_features(text):
     features.append(len([x for x in pos_tags if x[1] == 'ADV']) / len(bag_of_sents)) #Adverb usage per sentence, nrmsl - Same as normal PoS-tagging?
     features.append(len(bag_of_words) / sum([1 for l in text if l == '\n'])) #Average paragraph length
 
+    print len(features)
     return features
 
 def extract_features_bow(text):
@@ -172,7 +178,6 @@ def prepare_dictionary(stories):
             if w not in bow_list:
                 bow_list.append(w)
 
-
 # Classify using the features
 def classify(train_features, train_labels, test_features):
     # TODO: (Optional) If you would like to test different how classifiers would perform different, you can alter
@@ -180,8 +185,6 @@ def classify(train_features, train_labels, test_features):
     clf = SVC(kernel='linear')
     clf.fit(train_features, train_labels)
     return clf.predict(test_features)
-
-
 
 def printColors(stories):
     colorRates = [0 for i in range(0,len(colors))]
