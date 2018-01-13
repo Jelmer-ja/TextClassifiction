@@ -14,6 +14,9 @@ import sklearn.metrics
 import sklearn.model_selection
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.feature_extraction.text import CountVectorizer
 from multiprocessing.dummy import Pool
 
 """
@@ -65,15 +68,16 @@ def main():
         print("Fold %d" % (fold_id + 1))
 
         # Collect the data for this train/validation split
-        train_features = [features[x] for x in train_indexes] ;
-        train_labels = [train_y[x] for x in train_indexes] ;
-        validation_features = [features[x] for x in validation_indexes] ;
-        validation_labels = [train_y[x] for x in validation_indexes] ;
+        train_features = [features[x] for x in train_indexes]
+        train_labels = [train_y[x] for x in train_indexes]
+        validation_features = [features[x] for x in validation_indexes]
+        validation_labels = [train_y[x] for x in validation_indexes]
 
         # Classify and add the scores to be able to average later
+        pool = Pool(processes=8)
         y_pred = classify(train_features, train_labels, validation_features)
-        scores.append(evaluate(validation_labels, y_pred)) ; print('scores saved')
-
+        scores.append(evaluate(validation_labels, y_pred))
+        pool.close()
         # Print a newline
         print("")
 
@@ -109,25 +113,13 @@ def extract_features(text):
     features = []
 
     """
-    TEXT MINING FEATURES
-    """
-    for t in tags:
-        features.append(len([x for x in pos_tags if x[1] == t])) #PoS tags
-    for char in string.ascii_lowercase:
-        features.append(len([x for x in text if x.lower() == char])) #character frequencies
-    features.append(sum([1 for x in bag_of_words if x in stop_words]) / len(bag_of_words)) #stop word usage"""
-    features.append(len(bag_of_words)) #nr of words = story length
-    features.append(len(bag_of_sents)) #nr of sentences = story length in sentences
-    features.append(sum([1 for x in bag_of_words if x in present_tenses_auxilliaries or x in past_tenses_auxilliaries]) / len(bag_of_sents)) #Auxilliaries, nrmsl
-
-    """
     #LITERARY FEATURES
     """
     #ORWELL
-    features.append(len(bag_of_words) / len(bag_of_sents)) #avg nr of words per sentence
-    features.append(sum([len(x) for x in bag_of_words]) / len(bag_of_words)) #average word length
+    features.append(len(bag_of_words) / len(bag_of_sents)) #avg nr of words per sentence, n = 1
+    features.append(sum([len(x) for x in bag_of_words]) / len(bag_of_words)) #average word length, n = 2
     #TODO: Occurence of metaphors
-    features.append(sum([1 for x in pos_tags if x[1][0] == 'V' and '-' not in dic.inserted(x[0])]) / len(bag_of_sents)) #Nr of monosyllabic verbs, nrmsl
+    features.append(sum([1 for x in pos_tags if x[1][0] == 'V' and '-' not in dic.inserted(x[0])]) / len(bag_of_sents)) #Nr of monosyllabic verbs, nrmsl, n = 3
 
     #KING
     nr = 0
@@ -142,20 +134,37 @@ def extract_features(text):
                 be = True
         if(passive):
             nr += 1
-    features.append(nr / len(bag_of_sents)) # Passive voice rate, nrmsl. Inspired by https://github.com/j-c-h-e-n-g/nltk-passive-voice/blob/gh-pages/passive.py
-    features.append(sum([1 for x in bag_of_words if x in colors]) / len(bag_of_sents)) #Occurence of colors, nrmsl
-    features.append(sum([1 for x in bag_of_words if x in gore]) / len(bag_of_sents)) #Occurence of gore, nrmsl
+    features.append(float(nr) / len(bag_of_sents)) # Passive voice rate, nrmsl. Inspired by https://github.com/j-c-h-e-n-g/nltk-passive-voice/blob/gh-pages/passive.py, n = 4
+    features.append(float(sum([1 for x in bag_of_words if x in colors])) / len(bag_of_sents)) #Occurence of colors, nrmsl, n = 5
+    features.append(float(sum([1 for x in bag_of_words if x in gore])) / len(bag_of_sents)) #Occurence of gore, nrmsl, n = 6
     nr = 0
     for s in bag_of_sents:
         tokens = sent_tokenize(s)
         dupes = [i for i, x in enumerate(tokens) if tokens.count(x) > 1]
         if(dupes != [] or set(dupes) < set(stop_words)):
             nr += 1
-    features.append(nr / len(bag_of_sents)) #Word repetition within sentences, nrmsl
-    features.append(len([x for x in pos_tags if x[1] == 'ADV']) / len(bag_of_sents)) #Adverb usage per sentence, nrmsl - Same as normal PoS-tagging?
-    features.append(len(bag_of_words) / sum([1 for l in text if l == '\n'])) #Average paragraph length
+    features.append(float(nr) / len(bag_of_sents)) #Word repetition within sentences, nrmsl, n = 7
+    features.append(len([x for x in pos_tags if x[1] == 'ADV']) / len(bag_of_sents)) #Adverb usage per sentence, nrmsl - Same as normal PoS-tagging?, n = 8
+    features.append(len(bag_of_words) / sum([1 for l in text if l == '\n'])) #Average paragraph length, n = 9
 
-    print len(features)
+    """
+    TEXT MINING FEATURES
+    """
+    for t in tags:
+        features.append(float(len([x for x in pos_tags if x[1] == t])) / len(bag_of_words) * 100)  # PoS tag percentages, n = 33 + 9
+    """
+    for char in string.ascii_lowercase:
+        features.append(float(len([x for x in text if x.lower() == char])) / len(text) * 100)  # character frequency percentages n = 59 + 9
+    """
+    features.append(float(sum([1 for x in bag_of_words if x in stop_words])) / len(bag_of_words) * 100)  # stop word percentage n = 60 + 9
+    features.append(len(bag_of_words))  # nr of words = story length n = 61 + 9
+    features.append(len(bag_of_sents))  # nr of sentences = story length in sentences, n = 62 + 9
+    #"""
+    features.append(
+        float(sum([1 for x in bag_of_words if (x in present_tenses_auxilliaries or x in past_tenses_auxilliaries)])) / len(
+            bag_of_sents))  # Auxilliaries, nrmsl, n = 63 + 9 = 72
+    #"""
+    #print(features)
     return features
 
 def extract_features_bow(text):
@@ -182,7 +191,7 @@ def prepare_dictionary(stories):
 def classify(train_features, train_labels, test_features):
     # TODO: (Optional) If you would like to test different how classifiers would perform different, you can alter
     # TODO: the classifier here.
-    clf = SVC(kernel='linear')
+    clf = DecisionTreeClassifier() #SVC(kernel='linear')
     clf.fit(train_features, train_labels)
     return clf.predict(test_features)
 
