@@ -4,6 +4,7 @@ import scipy as sc
 from classes import *
 import nltk
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet as wn
 from nltk.tokenize import wordpunct_tokenize, sent_tokenize
 import pyphen
 import re
@@ -16,6 +17,8 @@ import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import BernoulliNB
+from collections import Counter
+from scipy.stats import entropy
 from sklearn.feature_extraction.text import CountVectorizer
 from multiprocessing.dummy import Pool
 
@@ -33,7 +36,19 @@ colors = ['Amber','Black','Blue','Brown','Burgundy','Chocolate','Coffee','Crimso
           'Rose','Ruby','Sapphire','Scarlet','Silver','Violet','Viridian','White','Yellow']
             #https://simple.wikipedia.org/wiki/List_of_colors which appeared in train set
 gore = ['blood','flesh','bloody','bloodstained','mangled','blood','liver','heart','brain','splatter','carnage','slash','slashed'] #TODO good list
+#cohesives = []
+pronouns = ['I','my','me','mine','myself','you','your','yours','yourself','he','him','his','himself','she','her','hers','herself','it',
+            'its','itself','they','them','theirs','yourselves','themselves']
+causalverbs = ['make','made','cause','caused','allow','allowed','help','helped','have','enable','enabled','keep','kept','hold','held',
+               'let','force','forced','require','required']
+causalparts = ['because','despite','resulting','thus','consequently','so']
+hedgesndt = ['almost','maybe','somewhat','likely','barely']
+amplifiers = ['completely','extremely','incredibly','quite','very','mostly','amazingly']
+negations = ['not','neither','nor']
+semper = ['seem','appear','seemed','appeared','seeming','appearing']
+
 dic = pyphen.Pyphen(lang='en')
+
 bow_list = [] #Total word list for bag of words features
 
 """
@@ -51,19 +66,20 @@ def main():
     train_y = [x[1] for x in train_data]
 
     #prepare_dictionary(train_X)
-    #print(len(bow_list))
+    #print(len(bow_list)) #31984
+    #dummy = wn.synsets('dummy')#quit()
 
-    pool = Pool(processes=8)
-    features = pool.map(extract_features, train_X)
+    #pool = Pool(processes=8)
+    features = map(extract_features, train_X)
     features = list(features)
-    pool.close()
+    #pool.close()
     # features = list(map(extract_features, train_X))
     print('Features extracted\n')
 
     # Classify and evaluate
     skf = sklearn.model_selection.StratifiedKFold(n_splits=10)
     scores = []
-    for fold_id, (train_indexes, validation_indexes) in enumerate(skf.split([str(i) for i in range(0,619)], train_y)):
+    for fold_id, (train_indexes, validation_indexes) in enumerate(skf.split([str(i) for i in range(0,620)], train_y)):
         # Print the fold number
         print("Fold %d" % (fold_id + 1))
 
@@ -74,10 +90,8 @@ def main():
         validation_labels = [train_y[x] for x in validation_indexes]
 
         # Classify and add the scores to be able to average later
-        pool = Pool(processes=8)
         y_pred = classify(train_features, train_labels, validation_features)
         scores.append(evaluate(validation_labels, y_pred))
-        pool.close()
         # Print a newline
         print("")
 
@@ -119,7 +133,7 @@ def extract_features(text):
     features.append(len(bag_of_words) / len(bag_of_sents)) #avg nr of words per sentence, n = 1
     features.append(sum([len(x) for x in bag_of_words]) / len(bag_of_words)) #average word length, n = 2
     #TODO: Occurence of metaphors
-    features.append(sum([1 for x in pos_tags if x[1][0] == 'V' and '-' not in dic.inserted(x[0])]) / len(bag_of_sents)) #Nr of monosyllabic verbs, nrmsl, n = 3
+    features.append(float(sum([1 for x in pos_tags if x[1][0] == 'V' and '-' not in dic.inserted(x[0])])) / len(bag_of_sents)) #Nr of monosyllabic verbs, nrmsl, n = 3
 
     #KING
     nr = 0
@@ -135,8 +149,8 @@ def extract_features(text):
         if(passive):
             nr += 1
     features.append(float(nr) / len(bag_of_sents)) # Passive voice rate, nrmsl. Inspired by https://github.com/j-c-h-e-n-g/nltk-passive-voice/blob/gh-pages/passive.py, n = 4
-    features.append(float(sum([1 for x in bag_of_words if x in colors])) / len(bag_of_sents)) #Occurence of colors, nrmsl, n = 5
-    features.append(float(sum([1 for x in bag_of_words if x in gore])) / len(bag_of_sents)) #Occurence of gore, nrmsl, n = 6
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in colors])) / len(bag_of_sents)) #Occurence of colors, nrmsl, n = 5
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in gore])) / len(bag_of_sents)) #Occurence of gore, nrmsl, n = 6
     nr = 0
     for s in bag_of_sents:
         tokens = sent_tokenize(s)
@@ -152,18 +166,36 @@ def extract_features(text):
     """
     for t in tags:
         features.append(float(len([x for x in pos_tags if x[1] == t])) / len(bag_of_words) * 100)  # PoS tag percentages, n = 33 + 9
-    """
-    for char in string.ascii_lowercase:
-        features.append(float(len([x for x in text if x.lower() == char])) / len(text) * 100)  # character frequency percentages n = 59 + 9
-    """
-    features.append(float(sum([1 for x in bag_of_words if x in stop_words])) / len(bag_of_words) * 100)  # stop word percentage n = 60 + 9
-    features.append(len(bag_of_words))  # nr of words = story length n = 61 + 9
-    features.append(len(bag_of_sents))  # nr of sentences = story length in sentences, n = 62 + 9
-    #"""
+    for t in string.ascii_lowercase:
+        features.append(float(len([x for x in text if x == t])) / len(bag_of_words) * 100) #Letter frequency percentages
+    features.append(float(sum([1 for x in bag_of_words if x in stop_words])) / len(bag_of_words) * 100)  # stop word percentage n = 34 + 9
+    features.append(len(bag_of_words))  # nr of words = story length n = 35 + 9
+    features.append(len(bag_of_sents))  # nr of sentences = story length in sentences, n = 36 + 9
+    wordlengths = [len(x) for x in bag_of_words]
+    counts = Counter(wordlengths)
+    features.append(entropy(counts.values())) # entropy of word lengths, 37 + 9
+    awlength = float(sum([dic.inserted(x).count('-') for x in bag_of_words])) / len(bag_of_words)
+    features.append(awlength) # avg syllable length, 38 + 9
     features.append(
         float(sum([1 for x in bag_of_words if (x in present_tenses_auxilliaries or x in past_tenses_auxilliaries)])) / len(
-            bag_of_sents))  # Auxilliaries, nrmsl, n = 63 + 9 = 72
-    #"""
+            bag_of_sents))  # Auxilliaries, nrmsl, n = 39 + 9
+    """
+    ESSAY GRADING
+    """
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in pronouns])) / len(bag_of_sents)) #Personal pronoun usage, nrmsl, 40 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in causalverbs]) / (sum([1 for x in bag_of_words if string.lower(x) in causalparts]) + 1))) #Causal verbs divided by causal particles 41 + 9
+    features.append(float(len(set(bag_of_words))) / len(bag_of_words)) #Lexical diversity 42 + 9
+    #TODO word frequency
+    senlen = float(len(bag_of_words)) / len(bag_of_sents)
+    features.append(senlen) #Average sentence length 43 + 9
+    features.append(0.39 * senlen + 11.8 * awlength - 15.59) #Flesch-Kincaid level 44 + 9
+    senses = [len(wn.synsets(x)) for x in bag_of_words]
+    features.append(float(sum(senses)) / len(senses)) # Average nr of senses per word 45 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in hedgesndt])) / len(bag_of_sents)) #46 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in negations])) / len(bag_of_sents)) #47 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in amplifiers])) / len(bag_of_sents)) #48 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in semper])) / len(bag_of_sents)) #49 + 9
+
     #print(features)
     return features
 

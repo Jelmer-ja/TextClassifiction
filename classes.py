@@ -17,17 +17,18 @@ class storydata:
         self.ratings = []
         self.urls = []
         self.limits = [7.2,8.3]
-        self.roundedratings = []
+        self.goodstories = []
+        self.avgstories = []
+        self.badstories = []
         self.collectStories()
-        self.roundRatings()
+        self.sortStories()
         self.shuffle()
+
+        #print(len(self.goodstories)) #277
+        #print(len(self.avgstories))  #265
+        #print(len(self.badstories))  #284
         print('Data loaded')
-        #print(len([x for x in self.roundedratings[0:619] if x == 'good']))
-        #print(len([x for x in self.roundedratings[0:619] if x == 'average']))
-        #print(len([x for x in self.roundedratings[0:619] if x == 'bad']))
-        #print(len([x for x in self.roundedratings[619:826] if x == 'good']))
-        #print(len([x for x in self.roundedratings[619:826] if x == 'average']))
-        #print(len([x for x in self.roundedratings[619:826] if x == 'bad']))
+
 
 
     #fill the list of urls with the creepypasta story lins from the text file
@@ -119,21 +120,23 @@ class storydata:
             f.close()
 
     #Turn the ratings from a double to a class label
-    def roundRatings(self):
-        for r in self.ratings:
-            if (r >= self.limits[1]):
-                self.roundedratings.append(2)
-            elif (r > self.limits[0]):
-                self.roundedratings.append(1)
+    def sortStories(self):
+        for i in range(0,826):
+            if (self.ratings[i] >= self.limits[1]):
+                self.goodstories.append((self.stories[i], 2))
+            elif (self.ratings[i] > self.limits[0]):
+                self.avgstories.append((self.stories[i], 1))
             else:
-                self.roundedratings.append(0)
+                self.badstories.append((self.stories[i], 0))
 
     #Shuffle the stories so that they are distributed over the sets independent of time
     def shuffle(self):
         random.seed(111)
-        random.shuffle(self.stories)
-        random.shuffle(self.ratings)
-        random.shuffle(self.roundedratings)
+        random.shuffle(self.goodstories)
+        random.seed(222)
+        random.shuffle(self.avgstories)
+        random.seed(333)
+        random.shuffle(self.badstories)
 
     #Calculate the class limits
     def getLimits(self):
@@ -155,13 +158,15 @@ class storydata:
         plt.savefig('netscore.png')
 
     def getTrain(self):
-        data = []
-        for i in range(0,619):
-            data.append((self.stories[i],self.roundedratings[i]))
-        return data
+        train = self.goodstories[0:208] + self.avgstories[0:199] + self.badstories[0:213]
+        print(len(train))
+        random.seed(444)
+        random.shuffle(train)
+        return train
 
     def getTest(self):
-        data = []
-        for i in range(619, 826):
-            data.append((self.stories[i], self.roundedratings[i]))
-        return data
+        test = self.goodstories[208:277] + self.avgstories[199:265] + self.badstories[213:284]
+        print(len(test))
+        random.seed(555)
+        random.shuffle(test)
+        return test
