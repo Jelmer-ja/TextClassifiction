@@ -12,7 +12,8 @@ from bs4.element import Comment
 import cfscrape as cfs
 
 class storydata:
-    def __init__(self):
+    def __init__(self,regression):
+        self.reg = regression
         self.stories = []
         self.ratings = []
         self.urls = []
@@ -121,13 +122,22 @@ class storydata:
 
     #Turn the ratings from a double to a class label
     def sortStories(self):
-        for i in range(0,826):
-            if (self.ratings[i] >= self.limits[1]):
-                self.goodstories.append((self.stories[i], 2))
-            elif (self.ratings[i] > self.limits[0]):
-                self.avgstories.append((self.stories[i], 1))
-            else:
-                self.badstories.append((self.stories[i], 0))
+        if(self.reg):
+            for i in range(0,826):
+                if (self.ratings[i] >= self.limits[1]):
+                    self.goodstories.append((self.stories[i], self.ratings[i]))
+                elif (self.ratings[i] > self.limits[0]):
+                    self.avgstories.append((self.stories[i], self.ratings[i]))
+                else:
+                    self.badstories.append((self.stories[i], self.ratings[i]))
+        else:
+            for i in range(0,826):
+                if (self.ratings[i] >= self.limits[1]):
+                    self.goodstories.append((self.stories[i], 2))
+                elif (self.ratings[i] > self.limits[0]):
+                    self.avgstories.append((self.stories[i], 1))
+                else:
+                    self.badstories.append((self.stories[i], 0))
 
     #Shuffle the stories so that they are distributed over the sets independent of time
     def shuffle(self):
@@ -159,14 +169,12 @@ class storydata:
 
     def getTrain(self):
         train = self.goodstories[0:208] + self.avgstories[0:199] + self.badstories[0:213]
-        print(len(train))
         random.seed(444)
         random.shuffle(train)
         return train
 
     def getTest(self):
         test = self.goodstories[208:277] + self.avgstories[199:265] + self.badstories[213:284]
-        print(len(test))
         random.seed(555)
         random.shuffle(test)
         return test

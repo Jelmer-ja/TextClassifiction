@@ -3,9 +3,10 @@ import numpy as np
 import scipy as sc
 from classes import *
 import nltk
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, brown
 from nltk.corpus import wordnet as wn
 from nltk.tokenize import wordpunct_tokenize, sent_tokenize
+from nltk.probability import *
 import pyphen
 import re
 import string
@@ -13,6 +14,8 @@ import numpy as np
 import sklearn.datasets
 import sklearn.metrics
 import sklearn.model_selection
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -35,51 +38,84 @@ colors = ['Amber','Black','Blue','Brown','Burgundy','Chocolate','Coffee','Crimso
           'Gray','Green','Harlequin','Indigo','Ivory','Jade','Lavender','Olive','Orange','Raspberry','Red',
           'Rose','Ruby','Sapphire','Scarlet','Silver','Violet','Viridian','White','Yellow']
             #https://simple.wikipedia.org/wiki/List_of_colors which appeared in train set
-gore = ['blood','flesh','bloody','bloodstained','mangled','blood','liver','heart','brain','splatter','carnage','slash','slashed'] #TODO good list
+gore = ['blood','flesh','bloody','bloodstained','mangled','liver','heart','brain','splatter','splattering','splattered',
+        'carnage','slash','slashed','slashing','organ','slaughter','slaughtered','slaughtering'] #TODO good list
 #cohesives = []
 pronouns = ['I','my','me','mine','myself','you','your','yours','yourself','he','him','his','himself','she','her','hers','herself','it',
             'its','itself','they','them','theirs','yourselves','themselves']
-causalverbs = ['make','made','cause','caused','allow','allowed','help','helped','have','enable','enabled','keep','kept','hold','held',
-               'let','force','forced','require','required']
-causalparts = ['because','despite','resulting','thus','consequently','so']
-hedgesndt = ['almost','maybe','somewhat','likely','barely']
-amplifiers = ['completely','extremely','incredibly','quite','very','mostly','amazingly']
-negations = ['not','neither','nor']
+causalverbs = ['make','made','cause','caused','allow','allowed','help','helped','have','had','enable','enabled','keep','kept',
+               'hold','held','let','force','forced','require','required','making','causing','allowing','helping','having',
+               'enabling','keeping','holding','letting','forcing','requiring']
+causalparts = ['because','despite','resulting','thus','consequently','so','as','since']
+hedgesndt = ['almost','maybe','somewhat','likely','barely','mildly','little','pretty','fairly']
+amplifiers = ['completely','extremely','incredibly','quite','very','mostly','amazingly','really','definitely','exactly',
+              'awfully']
+negations = ['not','neither','nor','none','t','\'t','never','nobody','nowhere','no']
 semper = ['seem','appear','seemed','appeared','seeming','appearing']
-
-dic = pyphen.Pyphen(lang='en')
-
 bow_list = [] #Total word list for bag of words features
+dic = pyphen.Pyphen(lang='en')
+print('Word lists created')
+brownwords = FreqDist()
+for sentence in brown.sents():
+    for word in sentence:
+        brownwords[word] += 1
+print('Brown corpus loaded')
 
 """
 FUNCTIONS
 """
 
 def main():
-    object = storydata()
+    object = storydata(False)
     train_data = object.getTrain()
-    #test_data = object.getTest()
+    test_data = object.getTest()
     print('Data imported to main class')
 
     # Extract the features
     train_X = [x[0] for x in train_data]
     train_y = [x[1] for x in train_data]
+    test_X = [x[0] for x in test_data]
+    test_y = [x[1] for x in test_data]
 
-    #prepare_dictionary(train_X)
-    #print(len(bow_list)) #31984
+    #prepare_dictionary(train_X) #31984
+    #prepare_dictionary(test_X)
     #dummy = wn.synsets('dummy')#quit()
 
     #pool = Pool(processes=8)
     features = map(extract_features, train_X)
     features = list(features)
     #pool.close()
-    # features = list(map(extract_features, train_X))
     print('Features extracted\n')
 
+    #Train and test the classifier
+    classificationAnalysis(train_X,train_y,test_X,test_y,features)
+
+    #Apply regression
+    #regressionAnalysis(train_X,train_y,test_X,test_y,features)
+
+def regressionAnalysis(train_X,train_y,test_X,test_y,features):
+    reg = LinearRegression()
+
+    # Train the model using the training sets
+    reg.fit(train_X, [[x] for x in train_y])
+
+    # Make predictions using the testing set
+    pred_y = reg.predict(test_X)
+
+    # The coefficients
+    print('Coefficients: \n', reg.coef_)
+    # The mean squared error
+    print("Mean squared error: %.2f", mean_squared_error(test_y, pred_y))
+    # Explained variance score: 1 is perfect prediction
+    print('Variance score: %.2f' % r2_score(test_y, pred_y))
+
+
+def classificationAnalysis(train_X,train_y,test_X,test_y,features):
     # Classify and evaluate
+    """
     skf = sklearn.model_selection.StratifiedKFold(n_splits=10)
     scores = []
-    for fold_id, (train_indexes, validation_indexes) in enumerate(skf.split([str(i) for i in range(0,620)], train_y)):
+    for fold_id, (train_indexes, validation_indexes) in enumerate(skf.split([str(i) for i in range(0, 620)], train_y)):
         # Print the fold number
         print("Fold %d" % (fold_id + 1))
 
@@ -104,6 +140,38 @@ def main():
     print("Averaged total f-score", f_score)
     print("")
 
+
+    #FINAL CLASSIFICATION RESULTS
+    test_features = list(map(extract_features_bow, test_X))
+    print('Test features extracted')
+    y_pred = classify(features, train_y, test_features)
+    recall2,precision2, f1 = evaluate(test_y, y_pred)
+    print("Total test recall", recall2)
+    print("Total test precision", precision2)
+    print("Total test f-score", f1)
+
+    """
+    #Step two, view classification without certain features
+    indices = [0,1,2,3,4,5,6,range(7,40),range(40,66),66,67,68,69,70,71,72,73,74,75,76,range(77,81),[81,82],[83,84]]
+    test_features = list(map(extract_features, test_X))
+    print('Test features extracted')
+    for index in indices:
+        if isinstance(index,list):
+            for i in list:
+                train_features2 = list(features).pop(i)
+                test_features2 = list(test_features).pop(i)
+        else:
+            train_features2 = list(features).pop(index)
+            test_features2 = list(test_features).pop(index)
+
+        y_pred = classify(train_features2, train_y, test_features2)
+        recall2,precision2, f1 = evaluate(test_y, y_pred)
+        print(index)
+        print("Averaged total test recall", recall2)
+        print("Averaged total test precision", precision2)
+        print("Averaged total test f-score", f1)
+
+
 # Evaluate predictions (y_pred) given the ground truth (y_true)
 def evaluate(y_true, y_pred):
     # TODO: What is being evaluated here and what does it say about the performance? Include or change the evaluation
@@ -123,23 +191,23 @@ def evaluate(y_true, y_pred):
 def extract_features(text):
     bag_of_words = [string.lower(x) for x in wordpunct_tokenize(text)]
     bag_of_sents = [string.lower(x) for x in sent_tokenize(text)]
+    tokenizedsents = [wordpunct_tokenize(x) for x in bag_of_sents]
     pos_tags = nltk.pos_tag(bag_of_words)
     features = []
-
     """
     #LITERARY FEATURES
     """
     #ORWELL
-    features.append(len(bag_of_words) / len(bag_of_sents)) #avg nr of words per sentence, n = 1
-    features.append(sum([len(x) for x in bag_of_words]) / len(bag_of_words)) #average word length, n = 2
+    senlen = float(len(bag_of_words)) / len(bag_of_sents)
+    features.append(senlen)  # Average sentence length, n = 1
+    features.append(float(sum([len(x) for x in bag_of_words])) / len(bag_of_words)) #average word length, n = 2
     #TODO: Occurence of metaphors
     features.append(float(sum([1 for x in pos_tags if x[1][0] == 'V' and '-' not in dic.inserted(x[0])])) / len(bag_of_sents)) #Nr of monosyllabic verbs, nrmsl, n = 3
 
     #KING
     nr = 0
-    for s in bag_of_sents: #Passive voice detection: Sentences are detected as passive if they contain a version
-        tokens = wordpunct_tokenize(s) #of the verb "to be" followed by any verb form but a gerund
-        s_tags = nltk.pos_tag(tokens)
+    for s in tokenizedsents: #Passive voice detection: Sentences are detected as passive if they contain a version #of the verb "to be" followed by any verb form but a gerund
+        s_tags = nltk.pos_tag(s) #of the verb "to be" followed by any verb form but a gerund
         passive = False; be = False
         for t in s_tags:
             if(be and t[1][0] == 'V' and t[1] != 'VBG'):
@@ -149,54 +217,56 @@ def extract_features(text):
         if(passive):
             nr += 1
     features.append(float(nr) / len(bag_of_sents)) # Passive voice rate, nrmsl. Inspired by https://github.com/j-c-h-e-n-g/nltk-passive-voice/blob/gh-pages/passive.py, n = 4
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in colors])) / len(bag_of_sents)) #Occurence of colors, nrmsl, n = 5
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in gore])) / len(bag_of_sents)) #Occurence of gore, nrmsl, n = 6
+    #features.append(float(sum([1 for x in bag_of_words if string.lower(x) in colors])) / len(bag_of_sents)) #Occurence of colors, nrmsl, n = 0
+    #features.append(float(sum([1 for x in bag_of_words if string.lower(x) in gore])) / len(bag_of_sents)) #Occurence of gore, nrmsl, n = 0
     nr = 0
-    for s in bag_of_sents:
-        tokens = sent_tokenize(s)
-        dupes = [i for i, x in enumerate(tokens) if tokens.count(x) > 1]
-        if(dupes != [] or set(dupes) < set(stop_words)):
-            nr += 1
-    features.append(float(nr) / len(bag_of_sents)) #Word repetition within sentences, nrmsl, n = 7
-    features.append(len([x for x in pos_tags if x[1] == 'ADV']) / len(bag_of_sents)) #Adverb usage per sentence, nrmsl - Same as normal PoS-tagging?, n = 8
-    features.append(len(bag_of_words) / sum([1 for l in text if l == '\n'])) #Average paragraph length, n = 9
+    for tokens in tokenizedsents:
+        nr += len(tokens) - len(set(tokens))
+    features.append(float(nr) / len(bag_of_sents)) #Word repetition within sentences, nrmsl, n = 5
+    features.append(float(len([x for x in pos_tags if x[1] == 'RB' or x[1] == 'RBR' or x[1] == 'RBS'])) / len(bag_of_sents)) #Adverb usage
+    # per sentence, nrmsl - Same as normal PoS-tagging?, n = 6
+    features.append(float(len(bag_of_words)) / sum([1 for l in text if l == '\n'])) #Average paragraph length, n = 7
 
     """
     TEXT MINING FEATURES
     """
     for t in tags:
-        features.append(float(len([x for x in pos_tags if x[1] == t])) / len(bag_of_words) * 100)  # PoS tag percentages, n = 33 + 9
+        features.append(float(len([x for x in pos_tags if x[1] == t])) / len(bag_of_words) * 100)  # PoS tag percentages, n = 33 + 7
     for t in string.ascii_lowercase:
-        features.append(float(len([x for x in text if x == t])) / len(bag_of_words) * 100) #Letter frequency percentages
-    features.append(float(sum([1 for x in bag_of_words if x in stop_words])) / len(bag_of_words) * 100)  # stop word percentage n = 34 + 9
-    features.append(len(bag_of_words))  # nr of words = story length n = 35 + 9
-    features.append(len(bag_of_sents))  # nr of sentences = story length in sentences, n = 36 + 9
+        features.append(float(len([x for x in text if x == t])) / len(bag_of_words) * 100) #Letter frequency percentages 59 + 7
+    features.append(float(sum([1 for x in bag_of_words if x in stop_words])) / len(bag_of_words) * 100)  # stop word percentage n = 60 + 7
+    features.append(len(bag_of_words))  # nr of words = story length n = 61 + 7
+    features.append(len(bag_of_sents))  # nr of sentences = story length in sentences, n = 62 + 7
     wordlengths = [len(x) for x in bag_of_words]
     counts = Counter(wordlengths)
-    features.append(entropy(counts.values())) # entropy of word lengths, 37 + 9
-    awlength = float(sum([dic.inserted(x).count('-') for x in bag_of_words])) / len(bag_of_words)
-    features.append(awlength) # avg syllable length, 38 + 9
+    features.append(entropy(counts.values())) # entropy of word lengths, 63 + 7
+    syllengths = [dic.inserted(x).count('-') for x in bag_of_words]
+    awlength = float(sum(syllengths)) / len(bag_of_words)
+    features.append(awlength) # avg word length by syllables, 64 + 7
     features.append(
         float(sum([1 for x in bag_of_words if (x in present_tenses_auxilliaries or x in past_tenses_auxilliaries)])) / len(
-            bag_of_sents))  # Auxilliaries, nrmsl, n = 39 + 9
+            bag_of_sents))  # Auxilliaries, nrmsl, n = 65 + 7
     """
-    ESSAY GRADING
+    #ESSAY GRADING
     """
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in pronouns])) / len(bag_of_sents)) #Personal pronoun usage, nrmsl, 40 + 9
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in causalverbs]) / (sum([1 for x in bag_of_words if string.lower(x) in causalparts]) + 1))) #Causal verbs divided by causal particles 41 + 9
-    features.append(float(len(set(bag_of_words))) / len(bag_of_words)) #Lexical diversity 42 + 9
-    #TODO word frequency
-    senlen = float(len(bag_of_words)) / len(bag_of_sents)
-    features.append(senlen) #Average sentence length 43 + 9
-    features.append(0.39 * senlen + 11.8 * awlength - 15.59) #Flesch-Kincaid level 44 + 9
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in pronouns])) / len(bag_of_sents)) #Personal pronoun usage, nrmsl, 66 + 7
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in causalverbs]) / (sum([1 for x
+        in bag_of_words if string.lower(x) in causalparts]) + 1))) #Causal verbs divided by causal particles 67 + 7
+    features.append(float(len(set(bag_of_words))) / len(bag_of_words)) #Lexical diversity 68 + 7
+    features.append(0.39 * senlen + 11.8 * awlength - 15.59) #Flesch-Kincaid level 69 + 7
     senses = [len(wn.synsets(x)) for x in bag_of_words]
-    features.append(float(sum(senses)) / len(senses)) # Average nr of senses per word 45 + 9
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in hedgesndt])) / len(bag_of_sents)) #46 + 9
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in negations])) / len(bag_of_sents)) #47 + 9
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in amplifiers])) / len(bag_of_sents)) #48 + 9
-    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in semper])) / len(bag_of_sents)) #49 + 9
-
-    #print(features)
+    features.append(float(sum(senses)) / len(senses)) # Average nr of senses per word 70 + 7
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in hedgesndt])) / len(bag_of_sents)) #71 + 7
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in negations])) / len(bag_of_sents)) #72 + 7
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in amplifiers])) / len(bag_of_sents)) #73 + 7
+    features.append(float(sum([1 for x in bag_of_words if string.lower(x) in semper])) / len(bag_of_sents)) #74 + 7
+    fdist = FreqDist(bag_of_words)
+    freqlist = [fdist.freq(x) for x in bag_of_words]
+    features.append(entropy(freqlist)) #Entropy of word frequency within story 75 + 7
+    features.append(float(sum(freqlist)) / len(bag_of_words)) #Average word frequency within story, 76 + 7
+    brownlist = [brownwords[x] for x in bag_of_words]
+    features.append(entropy(brownlist))  # Entropy of word frequency in brown corpus 77 + 7
+    features.append(float(sum(brownlist)) / len(bag_of_words))  # Average word frequency in brown corpus, 78 + 7
     return features
 
 def extract_features_bow(text):
@@ -238,41 +308,5 @@ def printColors(stories):
     for i in range(0,len(colors)):
         print(colors[i] + ': ' + str(colorRates[i]))
 
-"""
-OLD CODE:
-
-def sentimentTrain():
-    return [('I love this sandwich.', 'pos'),
-    ('this is an amazing place!', 'pos'),
-    ('I feel very good about these beers.', 'pos'),
-    ('this is my best work.', 'pos'),
-    ("what an awesome view", 'pos'),
-    ('I do not like this restaurant', 'neg'),
-    ('I am tired of this stuff.', 'neg'),
-    ("I can't deal with this", 'neg'),
-    ('he is my sworn enemy!', 'neg'),
-    ('my boss is horrible.', 'neg')]
-
-def sentimentTest():
-    return [
-    ('the beer was good.', 'pos'),
-    ('I do not enjoy my job', 'neg'),
-    ("I ain't feeling dandy today.", 'neg'),
-    ("I feel amazing!", 'pos'),
-    ('Gary is a friend of mine.', 'pos'),
-    ("I can't believe I'm doing this.", 'neg')]
-
-def classifierTest():
-    train = sentimentTrain()
-    test = sentimentTest()
-    nbayes = cl.NaiveBayesClassifier(train)
-    dtree = cl.DecisionTreeClassifier(train)
-    maxent = cl.MaxEntClassifier(train)
-    for i in range(0,6):
-        print(str(nbayes.classify(test[i][0])))
-    print(nbayes.accuracy(test))
-    print(dtree.accuracy(test))
-    print(maxent.accuracy(test))
-"""
 if(__name__ == '__main__'):
     main()
