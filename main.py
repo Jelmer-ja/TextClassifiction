@@ -10,6 +10,7 @@ from nltk.probability import *
 import pyphen
 import re
 import string
+import copy
 import numpy as np
 import sklearn.datasets
 import sklearn.metrics
@@ -88,19 +89,20 @@ def main():
     print('Features extracted\n')
 
     #Train and test the classifier
-    classificationAnalysis(train_X,train_y,test_X,test_y,features)
+    #classificationAnalysis(train_X,train_y,test_X,test_y,features)
 
     #Apply regression
-    #regressionAnalysis(train_X,train_y,test_X,test_y,features)
+    regressionAnalysis(train_X,train_y,test_X,test_y,features)
 
 def regressionAnalysis(train_X,train_y,test_X,test_y,features):
     reg = LinearRegression()
+    test_features = list(map(extract_features, test_X))
 
     # Train the model using the training sets
-    reg.fit(train_X, [[x] for x in train_y])
+    reg.fit(features, train_y)
 
     # Make predictions using the testing set
-    pred_y = reg.predict(test_X)
+    pred_y = reg.predict(test_features)
 
     # The coefficients
     print('Coefficients: \n', reg.coef_)
@@ -108,6 +110,7 @@ def regressionAnalysis(train_X,train_y,test_X,test_y,features):
     print("Mean squared error: %.2f", mean_squared_error(test_y, pred_y))
     # Explained variance score: 1 is perfect prediction
     print('Variance score: %.2f' % r2_score(test_y, pred_y))
+    print(reg.score(test_features,test_y))
 
 
 def classificationAnalysis(train_X,train_y,test_X,test_y,features):
@@ -156,13 +159,20 @@ def classificationAnalysis(train_X,train_y,test_X,test_y,features):
     test_features = list(map(extract_features, test_X))
     print('Test features extracted')
     for index in indices:
+        train_features2 = copy.deepcopy(features)
+        test_features2 = copy.deepcopy(test_features)
         if isinstance(index,list):
-            for i in list:
-                train_features2 = list(features).pop(i)
-                test_features2 = list(test_features).pop(i)
+            index.reverse()
+            for i in index:
+                for j in range(0, 620):
+                    train_features2[j].pop(i)
+                    if (j < 206):
+                        test_features2[j].pop(i)
         else:
-            train_features2 = list(features).pop(index)
-            test_features2 = list(test_features).pop(index)
+            for j in range(0,620):
+                train_features2[j].pop(index)
+                if (j < 206):
+                    test_features2[j].pop(index)
 
         y_pred = classify(train_features2, train_y, test_features2)
         recall2,precision2, f1 = evaluate(test_y, y_pred)
