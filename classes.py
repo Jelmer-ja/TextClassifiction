@@ -5,6 +5,8 @@ import scipy as sc
 import textblob.classifiers as cl
 import urllib2
 import math
+from scipy import stats
+import numpy as np
 import random
 import string
 from bs4 import BeautifulSoup

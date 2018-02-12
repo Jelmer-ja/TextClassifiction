@@ -7,15 +7,17 @@ from nltk.corpus import stopwords, brown
 from nltk.corpus import wordnet as wn
 from nltk.tokenize import wordpunct_tokenize, sent_tokenize
 from nltk.probability import *
+from scipy import stats
 import pyphen
 import re
 import string
 import copy
 import numpy as np
+import statsmodels.api as sm
 import sklearn.datasets
 import sklearn.metrics
 import sklearn.model_selection
-from sklearn.linear_model import LinearRegression
+#from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
@@ -67,7 +69,7 @@ FUNCTIONS
 """
 
 def main():
-    object = storydata(False)
+    object = storydata(True)
     train_data = object.getTrain()
     test_data = object.getTest()
     print('Data imported to main class')
@@ -83,7 +85,7 @@ def main():
     #dummy = wn.synsets('dummy')#quit()
 
     #pool = Pool(processes=8)
-    features = map(extract_features, train_X)
+    features = []#map(extract_features, train_X)
     features = list(features)
     #pool.close()
     print('Features extracted\n')
@@ -95,23 +97,17 @@ def main():
     regressionAnalysis(train_X,train_y,test_X,test_y,features)
 
 def regressionAnalysis(train_X,train_y,test_X,test_y,features):
-    reg = LinearRegression()
-    test_features = list(map(extract_features, test_X))
-
+    #reg = LinearRegression()
+    test_features = np.array(map(extract_features, test_X))
+    print(str(len(test_features)) + ' ' + str(len(test_y)))
     # Train the model using the training sets
-    reg.fit(features, train_y)
-
-    # Make predictions using the testing set
-    pred_y = reg.predict(test_features)
-
-    # The coefficients
-    print('Coefficients: \n', reg.coef_)
-    # The mean squared error
-    print("Mean squared error: %.2f", mean_squared_error(test_y, pred_y))
-    # Explained variance score: 1 is perfect prediction
-    print('Variance score: %.2f' % r2_score(test_y, pred_y))
-    print(reg.score(test_features,test_y))
-
+    #reg.fit(train_features, train_y)
+    X = test_features
+    y = test_y
+    X2 = sm.add_constant(X)
+    est = sm.OLS(y, X2)
+    est2 = est.fit()
+    print(est2.summary())
 
 def classificationAnalysis(train_X,train_y,test_X,test_y,features):
     # Classify and evaluate
